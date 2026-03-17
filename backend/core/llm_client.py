@@ -8,7 +8,7 @@ from openai import OpenAI
 from typing import Iterator
 
 # 可透過環境變數覆蓋（方便未來切換模型）
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://litellm-db.nv.ciminfra-dev.dev.tsmc.com/v1")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://litellm-db.nv.123.v1")
 LLM_API_KEY  = os.getenv("LLM_API_KEY",  "123456")
 LLM_MODEL    = os.getenv("LLM_MODEL",    "ai-infra/MiniMaxAI/MiniMax-M2.1")
 
