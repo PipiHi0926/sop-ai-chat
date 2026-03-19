@@ -9,7 +9,10 @@ API 端點：
 
 前端靜態檔案由 FastAPI 直接託管（/）。
 """
+import sys
 from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -38,7 +41,8 @@ async def startup():
     skills = load_all_skills()
 
 # ── 前端靜態資源 ───────────────────────────────────────────────────────────────# 前端靜態資源：純 HTML/Vanilla JS，無須打包
-FRONTEND_DIST = Path(__file__).parent.parent / "public"
+import os
+FRONTEND_DIST = Path(os.path.abspath(__file__)).parent.parent / "public"
 
 @app.get("/", include_in_schema=False)
 async def serve_index():
