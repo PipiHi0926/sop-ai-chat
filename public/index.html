@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI SOP 問答平台 (Vanilla JS 版)</title>
+  <style>
+    /* -------------------------------------------------------------------------- */
+    /* CSS Variables & Theme (Dark Mode + Glassmorphism)                          */
+    /* -------------------------------------------------------------------------- */
+    :root {
+      --bg-color: #0f172a;
+      --panel-bg: rgba(30, 41, 59, 0.7);
+      --panel-border: rgba(255, 255, 255, 0.1);
+      --primary-color: #3b82f6;
+      --primary-hover: #2563eb;
+      --text-color: #e2e8f0;
+      --text-muted: #94a3b8;
+      --chat-user-bg: #3b82f6;
+      --chat-ai-bg: rgba(51, 65, 85, 0.8);
+      --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg-color) linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+      color: var(--text-color);
+      font-family: var(--font-family);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+    }
+
+    /* -------------------------------------------------------------------------- */
+    /* Layout: Sidebar + Main Content                                             */
+    /* -------------------------------------------------------------------------- */
+    .app-container {
+      display: flex;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 280px;
+      min-width: 280px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-right: 1px solid var(--panel-border);
+      display: flex;
+      flex-direction: column;
+      transition: all 0.3s ease;
+    }
+
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--panel-border);
+    }
+    .sidebar-header h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      background: linear-gradient(90deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .skills-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* Skill Items */
+    .skill-item {
+      padding: 12px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .skill-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+      transform: translateY(-2px);
+    }
+    .skill-item.active {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: rgba(59, 130, 246, 0.5);
+    }
+    .skill-item h3 {
+      font-size: 0.95rem;
+      margin-bottom: 4px;
+      color: #fff;
+    }
+    .skill-item p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Main Chat Area */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .chat-header {
+      padding: 20px 30px;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .chat-header h1 {
+      font-size: 1.2rem;
+      font-weight: 500;
+    }
+    .header-badge {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    /* Chat Messages */
+    .chat-container {
+      flex: 1;
+      padding: 25px 30px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      scroll-behavior: smooth;
+    }
+
+    .message {
+      max-width: 80%;
+      display: flex;
+      flex-direction: column;
+      animation: fadeIn 0.3s ease forwards;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.user {
+      align-self: flex-end;
+    }
+    .message.user .bubble {
+      background: var(--chat-user-bg);
+      border-bottom-right-radius: 4px;
+    }
+    .message.assistant {
+      align-self: flex-start;
+    }
+    .message.assistant .bubble {
+      background: var(--chat-ai-bg);
+      border-bottom-left-radius: 4px;
+      border: 1px solid var(--panel-border);
+    }
+
+    .bubble {
+      padding: 14px 18px;
+      border-radius: 16px;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      word-wrap: break-word;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Simple Markdown Pre/Code Styling */
+    .bubble pre {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 10px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 10px 0;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+    .bubble code {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+
+    /* Input Area */
+    .input-area {
+      padding: 20px 30px;
+      background: var(--bg-color);
+      border-top: 1px solid var(--panel-border);
+    }
+
+    .input-container {
+      display: flex;
+      gap: 10px;
+      max-width: 900px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    textarea {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--panel-border);
+      color: #fff;
+      padding: 15px 20px;
+      border-radius: 24px;
+      font-size: 1rem;
+      resize: none;
+      height: 56px;
+      line-height: 24px;
+      font-family: inherit;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+    textarea:focus {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(59, 130, 246, 0.5);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+
+    button.send-btn {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    button.send-btn:hover {
+      background: var(--primary-hover);
+      transform: scale(1.05);
+    }
+    button.send-btn:disabled {
+      background: #475569;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    button.send-btn svg {
+      width: 24px;
+      height: 24px;
+      fill: currentColor;
+    }
+
+    /* Route Banner */
+    .route-banner {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      color: #bfdbfe;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .route-banner .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 5px;
+    }
+    .route-btn {
+      background: rgba(59, 130, 246, 0.2);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+    .route-btn:hover {
+      background: rgba(59, 130, 246, 0.4);
+    }
+
+    /* Typign Indicator */
+    .typing-indicator {
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px 8px;
+    }
+    .typing-indicator span {
+      width: 6px;
+      height: 6px;
+      background: #94a3b8;
+      border-radius: 50%;
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+    .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+    .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>✨ AI SOP</h2>
+      </div>
+      <div class="skills-list" id="skillsList">
+        <!-- Skills injected by JS -->
+      </div>
+    </aside>
+
+    <!-- Main Chat Content -->
+    <main class="main-content">
+      <div class="chat-header">
+        <h1 id="chatTitle">全域路由模式 (請直接提問)</h1>
+        <div class="header-badge" id="chatBadge">Auto mode</div>
+      </div>
+      
+      <div class="chat-container" id="chatContainer">
+        <div class="message assistant">
+          <div class="bubble">
+            您好！我整合了多種內部 SOP 與知識。您可以直接詢問問題（AI 會自動為您連結對應的知識），或者從左側直接點擊特定的模組對話。
+          </div>
+        </div>
+        <!-- Messages injected here -->
+      </div>
+
+      <div class="input-area">
+        <div class="input-container">
+          <textarea id="userInput" placeholder="輸入您的問題... (Enter 發送，Shift+Enter 換行)"></textarea>
+          <button id="sendBtn" class="send-btn" aria-label="發送">
+            <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    /* -------------------------------------------------------------------------- */
+    /* STATE & GLOBALS                                                            */
+    /* -------------------------------------------------------------------------- */
+    let availableSkills = [];
+    let currentSkillId = null;  // null means "Auto route mode"
+    let chatHistory = [];       // store context for the active skill
+    let isWaiting = false;
+
+    const DOM = {
+      skillsList: document.getElementById('skillsList'),
+      chatTitle: document.getElementById('chatTitle'),
+      chatBadge: document.getElementById('chatBadge'),
+      chatContainer: document.getElementById('chatContainer'),
+      userInput: document.getElementById('userInput'),
+      sendBtn: document.getElementById('sendBtn')
+    };
+
+    /* -------------------------------------------------------------------------- */
+    /* UTILS: Simple Markdown to HTML                                             */
+    /* -------------------------------------------------------------------------- */
+    function parseMarkdown(text) {
+      if (!text) return "";
+      
+      // Escape HTML tags to prevent XSS and formatting breaks
+      let html = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      
+      // Code Blocks
+      html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+      // Inline Code
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+      // Bold
+      html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      // Lists (simple hyphen)
+      html = html.replace(/^\s*-\s+(.*)$/gm, '<ul><li>$1</li></ul>');
+      html = html.replace(/<\/ul>\n<ul>/g, ''); // merge adjacent lists
+      
+      // Newlines to BR (if not inside PRE)
+      const parts = html.split(/(<pre>[\s\S]*?<\/pre>)/);
+      for(let i=0; i<parts.length; i++) {
+        if (!parts[i].startsWith('<pre>')) {
+          parts[i] = parts[i].replace(/\n/g, '<br>');
+        }
+      }
+      return parts.join('');
+    }
+
+    function scrollToBottom() {
+      DOM.chatContainer.scrollTop = DOM.chatContainer.scrollHeight;
+    }
+
+    /* -------------------------------------------------------------------------- */
+    /* UI UPDATES                                                                 */
+    /* -------------------------------------------------------------------------- */
+    function renderSkills() {
+      DOM.skillsList.innerHTML = '';
+      
+      // Add "Auto Route" button
+      const autoItem = document.createElement('div');
+      autoItem.className = `skill-item ${currentSkillId === null ? 'active' : ''}`;
+      autoItem.innerHTML = `<h3>🌐 智慧全域路由</h3><p>自動分析問題，推薦最合適的 SOP 教學</p>`;
+      autoItem.onclick = () => selectSkill(null);
+      DOM.skillsList.appendChild(autoItem);
+
+      // Add actual skills
+      availableSkills.forEach(skill => {
+        const div = document.createElement('div');
+        div.className = `skill-item ${currentSkillId === skill.id ? 'active' : ''}`;
+        div.innerHTML = `
+          <h3>📄 ${skill.name}</h3>
+          <p>${skill.description}</p>
+        `;
+        div.onclick = () => selectSkill(skill.id);
+        DOM.skillsList.appendChild(div);
+      });
+    }
+
+    function selectSkill(skillId) {
+      currentSkillId = skillId;
+      chatHistory = []; // Reset sub-chat context
+      renderSkills();
+      
+      if (skillId === null) {
+        DOM.chatTitle.textContent = "全域路由模式 (請直接提問)";
+        DOM.chatBadge.textContent = "Auto Mode";
+      } else {
+        const skill = availableSkills.find(s => s.id === skillId);
+        DOM.chatTitle.textContent = `SOP: ${skill.name}`;
+        DOM.chatBadge.textContent = `Specific Mode`;
+      }
+      
+      // Clear chat
+      DOM.chatContainer.innerHTML = '';
+      let welcomeStr = skillId 
+          ? `已切換至 **${availableSkills.find(s=>s.id===skillId).name}**。<br>請問關於這份 SOP，您有什麼需要協助的？` 
+          : `已切換至 **智慧全域模式**。<br>有任何系統相關問題都可以問我，我會幫您找出相關規範或幫你回答。`;
+          
+      addMessageToUI('assistant', welcomeStr);
+    }
+
+    function addMessageToUI(role, text) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `message ${role}`;
+      msgDiv.innerHTML = `<div class="bubble">${parseMarkdown(text)}</div>`;
+      DOM.chatContainer.appendChild(msgDiv);
+      scrollToBottom();
+      return msgDiv; // Return element so we can update it in streaming.
+    }
+
+    function addTypingIndicator() {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `message assistant typing-msg`;
+      msgDiv.innerHTML = `<div class="bubble"><div class="typing-indicator"><span></span><span></span><span></span></div></div>`;
+      DOM.chatContainer.appendChild(msgDiv);
+      scrollToBottom();
+      return msgDiv;
+    }
+    
+    function removeTypingIndicator() {
+      const typing = DOM.chatContainer.querySelector('.typing-msg');
+      if (typing) typing.remove();
+    }
+
+    function showRouteBanner(routeData) {
+      const banner = document.createElement('div');
+      banner.className = 'route-banner';
+      
+      let html = `<strong>🎯 AI 路由推薦</strong><p>${routeData.reason}</p>`;
+      
+      if (routeData.recommended_skills && routeData.recommended_skills.length > 0) {
+        html += `<div class="actions">`;
+        routeData.recommended_skills.forEach(skill => {
+          html += `<button class="route-btn" onclick="selectSkill('${skill.id}')">進入 ${skill.name} 詳談</button>`;
+        });
+        html += `</div>`;
+      }
+      
+      banner.innerHTML = html;
+      DOM.chatContainer.appendChild(banner);
+      scrollToBottom();
+    }
+
+    /* -------------------------------------------------------------------------- */
+    /* API & LOGIC                                                                */
+    /* -------------------------------------------------------------------------- */
+    async function fetchSkills() {
+      try {
+        const res = await fetch('/api/skills');
+        const data = await res.json();
+        availableSkills = data;
+        renderSkills();
+      } catch (e) {
+        console.error("Failed to load skills", e);
+        availableSkills = [];
+      }
+    }
+
+    async function handleSend() {
+      const text = DOM.userInput.value.trim();
+      if (!text || isWaiting) return;
+      
+      DOM.userInput.value = '';
+      DOM.sendBtn.disabled = true;
+      isWaiting = true;
+      
+      // User message
+      addMessageToUI('user', text);
+      const typingIndicator = addTypingIndicator();
+
+      if (currentSkillId === null) {
+        // --- 1. ROUTE MODE ---
+        try {
+          const res = await fetch('/api/route', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question: text })
+          });
+          const data = await res.json();
+          removeTypingIndicator();
+          
+          if (data.direct_answer) {
+             addMessageToUI('assistant', data.direct_answer);
+          }
+          if (data.recommended && data.recommended.length > 0) {
+             showRouteBanner(data);
+          } else if (!data.direct_answer) {
+             addMessageToUI('assistant', "抱歉，目前沒有找到與您問題直接相關的 SOP。");
+          }
+        } catch (e) {
+          removeTypingIndicator();
+          addMessageToUI('assistant', '⚠️ 連線錯誤，請稍後再試。');
+        }
+      } else {
+        // --- 2. CHAT WITH SKILL MODE (SSE STREAMING) ---
+        try {
+          const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              skill_id: currentSkillId,
+              message: text,
+              history: chatHistory
+            })
+          });
+          
+          removeTypingIndicator();
+          
+          if (!res.ok) throw new Error("API Error");
+          
+          // Read SSE Stream
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          
+          // Create an empty assistant message bubble to append to
+          const msgEl = addMessageToUI('assistant', ""); 
+          const bubbleEl = msgEl.querySelector('.bubble');
+          let fullResponse = "";
+          
+          while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, {stream: true});
+            // parse "data: ...\n\n"
+            const lines = chunk.split('\n');
+            for (let line of lines) {
+              if (line.startsWith('data: ')) {
+                let data = line.substring(6);
+                if (data === '[DONE]') {
+                  // End of stream
+                  break;
+                }
+                // unescape newlines if backend escaped them
+                data = data.replace(/\\n/g, '\n');
+                fullResponse += data;
+                // Live Markdown render
+                bubbleEl.innerHTML = parseMarkdown(fullResponse);
+                scrollToBottom();
+              }
+            }
+          }
+          
+          // Add to context history
+          chatHistory.push({ role: 'user', content: text });
+          chatHistory.push({ role: 'assistant', content: fullResponse });
+          
+        } catch(e) {
+          removeTypingIndicator();
+          addMessageToUI('assistant', '⚠️ 回覆中斷或連線失敗。');
+          console.error(e);
+        }
+      }
+      
+      isWaiting = false;
+      DOM.sendBtn.disabled = false;
+      DOM.userInput.focus();
+    }
+
+    /* -------------------------------------------------------------------------- */
+    /* EVENTS                                                                     */
+    /* -------------------------------------------------------------------------- */
+    DOM.sendBtn.addEventListener('click', handleSend);
+    DOM.userInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    });
+
+    // INIT
+    fetchSkills();
+    
+    // Add custom trigger to automatically re-render selection visual state 
+    // when using route-btn inside the chat (because it's not bound by default).
+    window.selectSkill = selectSkill;
+  </script>
+</body>
+</html>

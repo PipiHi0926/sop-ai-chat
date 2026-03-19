@@ -37,8 +37,8 @@ async def startup():
     global skills
     skills = load_all_skills()
 
-# ── 前端靜態資源 ───────────────────────────────────────────────────────────────# 前端靜態資源：React build 後的 dist/ 目錄
-FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
+# ── 前端靜態資源 ───────────────────────────────────────────────────────────────# 前端靜態資源：純 HTML/Vanilla JS，無須打包
+FRONTEND_DIST = Path(__file__).parent.parent / "public"
 
 @app.get("/", include_in_schema=False)
 async def serve_index():
